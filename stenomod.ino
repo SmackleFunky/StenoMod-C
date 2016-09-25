@@ -76,7 +76,7 @@ uint8_t read_column(uint8_t p) {
 bool look() {
   bool ret = false;
   for(int i = 0; i < 4; i++) {
-     uint8_t r = read_pin(i);
+     uint8_t r = read_column(i);
      ret |= r;
      b[i] |= r;
   }
@@ -92,8 +92,7 @@ void scan_keys() {
   while(key_pressed == false) {
     while(look() == false);
     delay(20);
-    if(look() == true)
-      key_pressed = true;
+    key_pressed = look();
   }
   led(true);
   while(look() == true);
@@ -103,10 +102,16 @@ void scan_keys() {
 // Send the current stroke stored in
 // b array
 void send_stroke() {
-  if(b[0]) send_byte(b[0]);
-  if(b[1]) send_byte(b[1] | 0x40);
-  if(b[2]) send_byte(b[2] | 0x80);
-  if(b[3]) send_byte(b[3] | 0xc0);
+  if(b[0])
+    send_byte(b[0]);
+  if(b[1])
+    send_byte(b[1] | 0x40);
+  if(b[2])
+    send_byte(b[2] | 0x80);
+  if(b[3])
+    send_byte(b[3] | 0xc0);
+  else
+    send_byte(0);
 }
 
 // Main loop.
