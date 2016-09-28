@@ -18,12 +18,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 For LGPL information:   http://www.gnu.org/copyleft/lesser.txt
 */
 
+#define REPEAT_TIMEOUT  300
+#define REPEAT_START_DELAY 800
+#define REPEAT_DELAY 30
+#define HOLD_DELAY 500
+
 uint8_t b[4] = {0, 0, 0, 0}; // Current Stroke
 uint8_t p[4] = {0, 0, 0, 0}; // Previous Stroke
 uint8_t c[4] = {0, 0, 0, 0}; // Copy of current
 uint8_t t[4] = {0, 0, 0, 0}; // Temporary
 uint8_t pin[4] = {11, 10, 9, 8};
 uint8_t LED = 13;
+uint64_t last_key_up = 0;
 
 #define NONE 0
 #define REPEAT 1
@@ -95,10 +101,10 @@ uint8_t read_column(uint8_t p) {
 // Return true if any key is pressed
 bool look(uint8_t* b) {
   bool ret = false;
-  for(int i = 0; i < 4; i++) {
-     uint8_t r = read_column(i);
-     ret |= r;
-     b[i] |= r;
+  for (int i = 0; i < 4; i++) {
+    uint8_t r = read_column(i);
+    ret |= r;
+    b[i] |= r;
   }
   return ret;
 }
@@ -109,57 +115,58 @@ void scan_keys() {
   uint8_t key_pressed = false;
   uint32_t last_send = 0;
   uint8_t mode = NONE;
-  uint32_t resend_millis = 800;
+  uint32_t resend_millis = REPEAT_START_DELAY;
   bool hold_check = false;
   bool need_send = true;
   copy_stroke(p, b);
   b[0] = b[1] = b[2] = b[3] = 0;
-  
-  while(key_pressed == false) {
-    while(look(b) == false);
+
+  while (key_pressed == false) {
+    while (look(b) == false);
     delay(20);
     key_pressed = look(b);
   }
-  while(look(b) == true) {
-    if((mode == NONE || mode == REPEAT) &&
-          compare_stroke(b, p) == 0) {
-      if(mode == NONE) {
+  while (look(b) == true) {
+    if ((mode == NONE || mode == REPEAT) &&
+        compare_stroke(b, p) == 0) {
+      if (mode == NONE && millis() - last_key_up < REPEAT_TIMEOUT) {
         mode = REPEAT;
         last_send = millis();
       }
-      else if(mode == REPEAT) {
-        if(millis() - last_send > resend_millis) {
-           send_stroke(b);
-           need_send = false;
-           last_send = millis();
-           resend_millis = 30;
+      else if (mode == REPEAT) {
+        if (millis() - last_send > resend_millis) {
+          send_stroke(b);
+          need_send = false;
+          led(true);
+          last_send = millis();
+          resend_millis = REPEAT_DELAY;
         }
       }
     }
-    if((mode == NONE || mode == HOLD) &&
-            compare_stroke(c, b) != 0) {
-      if(mode == NONE) {
+    if ((mode == NONE || mode == HOLD) &&
+        compare_stroke(c, b) != 0) {
+      if (mode == NONE) {
         hold_check = true;
         copy_stroke(c, b);
         last_send = millis();
-        resend_millis = 1000;
+        resend_millis = HOLD_DELAY;
       }
-      else if(mode == HOLD) {
+      else if (mode == HOLD) {
         mode = HOLD_SEND;
-        
+
       }
     }
-    if(mode == NONE && hold_check == true) {
-      if(millis() - last_send > resend_millis) {
+    if (mode == NONE && hold_check == true) {
+      if (millis() - last_send > resend_millis) {
         mode = HOLD;
         led(true);
       }
     }
-    else if(mode == HOLD_SEND) {
+    else if (mode == HOLD_SEND) {
       look(t);
       delayMicroseconds(20);
       look(t);
-      if(compare_stroke(t, c) == 0) {
+      if (compare_stroke(t, c) == 0) {
         send_stroke(b);
         need_send = false;
         copy_stroke(b, c);
@@ -168,25 +175,26 @@ void scan_keys() {
       clear_stroke(t);
     }
   }
-  if(need_send == true) {
+  if (need_send == true) {
     send_stroke(b);
   }
-  if(mode != NONE && mode != REPEAT)
+  if (mode != NONE && mode != REPEAT)
     clear_stroke(b);
   clear_stroke(c);
+  last_key_up = millis();
   led(false);
 }
 
 // Send the current stroke stored in
 // b array
 void send_stroke(uint8_t* b) {
-  if(b[0])
+  if (b[0])
     send_byte(b[0]);
-  if(b[1])
+  if (b[1])
     send_byte(b[1] | 0x40);
-  if(b[2])
+  if (b[2])
     send_byte(b[2] | 0x80);
-  if(b[3])
+  if (b[3])
     send_byte(b[3] | 0xc0);
   else
     send_byte(0);
