@@ -34,6 +34,8 @@ typedef struct {
    Mode mode;
    uint8_t current_stroke[4];
    uint8_t current_keys[4];
+   uint8_t current_keys_debounce[4];
+   uint32_t debounce_time;
    uint8_t previous_stroke[4];
    uint8_t sticky_stroke[4];
    uint8_t last_stroke[4];
@@ -73,12 +75,12 @@ void setup() {
 }
 
 void default_settings() {
-   state.repeat_enabled = REPEAT_ENABLED;
-   state.sticky_enabled = STICKY_ENABLED;
-   state.repeat_timeout = REPEAT_TIMEOUT;
-   state.repeat_start_delay = REPEAT_START_DELAY;
-   state.repeat_delay = REPEAT_DELAY;
-   state.sticky_delay = STICKY_DELAY;
+  state.repeat_enabled = REPEAT_ENABLED;
+  state.sticky_enabled = STICKY_ENABLED;
+  state.repeat_timeout = REPEAT_TIMEOUT;
+  state.repeat_start_delay = REPEAT_START_DELAY;
+  state.repeat_delay = REPEAT_DELAY;
+  state.sticky_delay = STICKY_DELAY;
 }
 
 /*** Stroke Manipulation Functions */
@@ -182,10 +184,10 @@ bool look(Stroke s, Stroke c) {
 }
 
 typedef struct {
-   void (*func)();
-   bool enabled;
-   uint32_t time_set;
-   uint32_t length;
+  void (*func)();
+  bool enabled;
+  uint32_t time_set;
+  uint32_t length;
 } Timer;
 
 void m_repeat_send();
@@ -200,13 +202,13 @@ Timer timers[] = {
 #define NUM_TIMERS 2
 
 void set_timer(uint8_t t, uint32_t length) {
-   timers[t].enabled = true;
-   timers[t].length = length;
-   timers[t].time_set = millis();
+  timers[t].enabled = true;
+  timers[t].length = length;
+  timers[t].time_set = millis();
 }
 
 void unset_timer(uint8_t t) {
-   timers[t].enabled = false;
+  timers[t].enabled = false;
 }
 
 void check_timers() {
@@ -233,7 +235,8 @@ void scan_keys() {
    } while (look(NULL, state.current_stroke) == false);
 
    // Loop until all keys are lifted
-   while (look(state.current_keys, state.current_stroke) == true) {
+   while (look(state.current_keys_debounce, state.current_stroke) == true) {
+     merge_stroke(state.current_keys, state.current_keys_debounce);
 
      // Notify listeners of changes in keys that are currently pressed
      if (compare_stroke(state.current_keys, state.last_keys) != 0) {
@@ -252,6 +255,10 @@ void scan_keys() {
      // Prepare for next iteration
      copy_stroke(state.last_keys, state.current_keys);
      copy_stroke(state.last_stroke, state.current_stroke);
+     if (millis() - state.debounce_time > 20) {
+       copy_stroke(state.current_keys, state.current_keys_debounce);
+       state.debounce_time = millis();
+     }
    }
    state.last_key_up = millis();
 
