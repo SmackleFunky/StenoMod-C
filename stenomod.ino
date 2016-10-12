@@ -54,6 +54,7 @@ typedef struct {
    uint16_t sticky_delay;
 } State;
 
+uint8_t inpin[6] = {19, 18, 17, 16, 15, 14};
 uint8_t pin[4] = {11, 10, 9, 8};
 uint8_t LED = 13;
 uint64_t last_key_up = 0;
@@ -64,14 +65,18 @@ void default_settings();
 void reset_state(bool set_prev);
 
 // Setup ports and serial
+// All unused ports get weak pullup
 void setup() {
-   DDRB = DDRC = DDRD = 0;
-   PORTC = PORTD = 0xff;
-   PORTB = 0xf0;
-   led(false);
-   Serial.begin(9600);
-   reset_state(false);
-   default_settings();
+  for (int i = 0; i < 20; i++) {
+    pinMode (i, INPUT_PULLUP);
+  }
+  for (int i = 0; i < 4; i++) {
+    pinMode (pin [i], INPUT);
+  }
+  led(false);
+  Serial.begin(9600);
+  reset_state(false);
+  default_settings();
 }
 
 void default_settings() {
@@ -128,7 +133,12 @@ void set_input(uint8_t p) {
 // bit value of 1 means key is
 // pressed
 uint8_t read_byte() {
-   return PINC ^ 0x3f;
+   uint8_t x = 0;
+   for (int i = 0; i < 6; i++) {
+      x *= 2;
+      x |= digitalRead (inpin[i]);
+   }
+   return (x ^ 0x3f);
 }
 
 // Send byte over serial
