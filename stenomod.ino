@@ -54,6 +54,7 @@ typedef struct {
    uint16_t sticky_delay;
 } State;
 
+// Using Arduino pin numbers
 uint8_t inpin[6] = {19, 18, 17, 16, 15, 14};
 uint8_t pin[4] = {11, 10, 9, 8};
 uint8_t LED = 13;
